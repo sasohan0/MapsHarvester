@@ -13,12 +13,67 @@ const UI = {
   sendWebhook: document.getElementById("sendWebhook"),
 };
 
+const State = {
+  cloudTags: [],
+};
+
 function addLog(msg, type = "info") {
   const div = document.createElement("div");
   div.innerText = `> ${msg}`;
   div.className = `log-${type}`;
   UI.log.appendChild(div);
   UI.log.scrollTop = UI.log.scrollHeight;
+}
+
+function slugify(value) {
+  return value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/--+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
+}
+
+function getDownloadDateStamp() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}_${hh}${min}`;
+}
+
+async function getMapSearchLabel() {
+  let query = "maps";
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    if (tab) {
+      const url = new URL(tab.url);
+      if (url.searchParams.has("q")) {
+        query = url.searchParams.get("q");
+      } else if (url.pathname.includes("/search/")) {
+        query = decodeURIComponent(url.pathname.split("/search/")[1].split("/")[0] || "maps");
+      } else if (tab.title) {
+        query = tab.title.replace(/\s*-\s*Google Maps$/i, "");
+      }
+    }
+  } catch (err) {
+    console.warn("Could not derive map search label", err);
+  }
+  return slugify(query || "maps");
+}
+
+async function buildDownloadFileName(filter) {
+  const searchLabel = await getMapSearchLabel();
+  const cloudLabel = State.cloudTags.slice(0, 3).join("-") || "lead";
+  const dateStamp = getDownloadDateStamp();
+  const filterLabel = filter === "email" ? "emails-only" : "all";
+  return `MapsHarvester_${searchLabel}_${cloudLabel}_${filterLabel}_${dateStamp}.csv`;
 }
 
 // Event-Driven UI Update
@@ -80,6 +135,7 @@ function generateWordCloud(leads) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
   UI.cloud.innerHTML = "";
+  State.cloudTags = [];
   sorted.forEach(([word, count]) => {
     let span = document.createElement("span");
     span.className = "cloud-word";
@@ -87,6 +143,7 @@ function generateWordCloud(leads) {
     let size = 0.65 + count * 0.05;
     span.style.fontSize = `${Math.min(size, 1.2)}rem`;
     UI.cloud.appendChild(span);
+    State.cloudTags.push(slugify(word));
   });
 }
 
@@ -167,9 +224,12 @@ UI.sendWebhook.addEventListener("click", () => {
   });
 });
 
-document.getElementById("exportCSV").addEventListener("click", () => {
+document.getElementById("exportCSV").addEventListener("click", async () => {
+  const filterValue = UI.exportFilter.value;
+  const fileName = await buildDownloadFileName(filterValue);
+
   chrome.runtime.sendMessage(
-    { action: "generateCSV", filter: UI.exportFilter.value },
+    { action: "generateCSV", filter: filterValue },
     (response) => {
       if (response && response.csvText) {
         const blob = new Blob([response.csvText], {
@@ -178,15 +238,12 @@ document.getElementById("exportCSV").addEventListener("click", () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute(
-          "download",
-          `Maps_V5_CRM_${UI.exportFilter.value}_${new Date().getTime()}.csv`,
-        );
+        link.setAttribute("download", fileName);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        addLog("CSV export complete.", "success");
+        addLog(`CSV export complete: ${fileName}`, "success");
       } else {
         addLog("CSV export failed or returned no data.", "error");
       }

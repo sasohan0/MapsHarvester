@@ -36,6 +36,7 @@ Maps Harvester injects a smart scraping engine directly into Google Maps results
 - **Duplicate protection**: skips duplicate businesses using `masterHistory`.
 - **Webhook export**: send leads to n8n, Zapier, Make, or any HTTP endpoint using the webhook URL field.
 - **Local CSV export**: download your data with optional email filtering.
+- **Dynamic CSV naming**: exports are saved with map search keywords, top word cloud categories, and a date stamp.
 - **Minimal UI**: side panel UX with live logging, counters, webhook controls, and export filters.
 
 ---
