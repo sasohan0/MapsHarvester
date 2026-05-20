@@ -1,67 +1,117 @@
-# MapsHarvester
+﻿# 🗺️ Maps Harvester V3: Google Maps Lead Extraction Extension
 
-MapsHarvester is a Chrome extension designed for harvesting business leads from Google Maps search results. It includes automated scraping, deep website crawl for emails and social links, webhook export support for n8n/Google Sheets pipelines, and CSV download capabilities.
+**Maps Harvester V3** is a Manifest V3 Chrome extension for extracting business leads from Google Maps search results. It combines automated scraping, website enrichment, webhook export, and CSV download support for agency workflows.
 
-## Features
+## 📑 Table of Contents
 
-- Smart lead extraction from Google Maps search results
-- Auto-scroll and continuous scraping until a configured target limit is reached
-- Duplicate detection and skip counter
-- Website deep crawl for email and social profile discovery
-- Webhook push to n8n, Zapier, Make, or any HTTP endpoint
-- Local CSV export with optional email-only filtering
-- Built as a Chrome Manifest V3 extension with side panel UI
+1. [Core Features](#core-features)
+2. [Architecture & File Structure](#architecture--file-structure)
+3. [Data Schema](#data-schema)
+4. [Key Code References](#key-code-references)
+5. [Installation & Setup](#installation--setup)
+6. [Usage](#usage)
+7. [Webhook Export](#webhook-export)
+8. [Notes](#notes)
 
-## Installation
+---
 
-1. Clone the repository or download the extension folder.
-2. Open Chrome and navigate to `chrome://extensions`.
-3. Enable `Developer mode` in the top-right.
+## 🚀 Core Features
+
+- **Google Maps scraping:** extracts business name, category, address, phone, website, rating, and review counts from search results.
+- **Deep website enrichment:** crawls each lead's website and contact pages to gather email addresses and social links.
+- **Duplicate detection:** maintains `masterHistory` to skip repeated business leads.
+- **Webhook export:** push harvested leads to n8n, Zapier, Make, or any webhook endpoint.
+- **CSV download:** export harvested leads locally as a CSV file with optional email-only filtering.
+- **Chrome side panel UI:** lightweight Manifest V3 extension UI with real-time status and logging.
+
+## 🏗 Architecture & File Structure
+
+| File Name           | Purpose                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| `manifest.json`     | Extension metadata and permissions for side panel, storage, scripting, and downloads.           |
+| `sidepanel.html`    | Side panel UI structure and styling.                                                            |
+| `sidepanel.js`      | UI logic, button controls, webhook sending, storage updates, and CSV export handling.           |
+| `content.js`        | Google Maps DOM scraper injected into the active tab to collect lead data from search cards.    |
+| `service_worker.js` | Background worker for lead processing, deduplication, deep crawling, and CSV generation.        |
+
+> No external frameworks are required; the extension is built with vanilla HTML, CSS, and JavaScript.
+
+## 📊 Data Schema
+
+Harvested leads are stored in Chrome local storage and generally contain the following fields:
+
+```json
+{
+  "id": "String",
+  "name": "String",
+  "category": "String",
+  "address": "String",
+  "phone": "String",
+  "website": "String",
+  "rating": "String",
+  "reviews": "String",
+  "email": "String",
+  "socials": "String"
+}
+```
+
+The extension also tracks:
+- `masterHistory` — deduplication history for business IDs
+- `skippedCount` — count of leads skipped due to duplicates
+- `isScraping` — current scraping state flag
+
+## 🧩 Key Code References
+
+### `content.js`
+- Scans Google Maps result cards using `document.querySelectorAll('div.Nv2PK')`
+- Extracts business details, website links, category, address, and phone numbers
+- Scrolls the feed and stops when the end of the list is reached or the configured limit arrives
+- Sends scraped leads to the background worker for processing
+
+### `service_worker.js`
+- Receives lead batches and deduplicates them using `masterHistory`
+- Performs deep crawling on lead websites to find emails and social links
+- Generates CSV output in `exportToCSV(filter)` for local export
+- Handles runtime messages from the side panel UI
+
+### `sidepanel.js`
+- Controls scraping flow and updates UI state
+- Saves webhook URL to `chrome.storage.local`
+- Sends harvested leads to a webhook endpoint as JSON
+- Triggers CSV export and download via background messaging
+
+## 🛠 Installation & Setup
+
+1. Clone or download the repository.
+2. Open Chrome and go to `chrome://extensions`.
+3. Enable `Developer mode` in the top-right corner.
 4. Click `Load unpacked` and select the `MapsHarvester` folder.
-5. Open Google Maps and run a relevant search.
+5. Open Google Maps and perform a search.
 
 ## Usage
 
-1. Open the extension using the action button or the side panel.
-2. Set the `Auto-Stop Limit` for the maximum number of leads to harvest.
+1. Open the extension side panel.
+2. Set the `Auto-Stop Limit` for the maximum number of leads.
 3. Click `Start Scraping` while on a Google Maps results page.
-4. Monitor progress through the terminal-style log and session lead counter.
-5. Use `Stop` to manually abort the scraping session.
+4. Monitor progress in the terminal-style log area.
+5. Use `Trigger Webhook to Sheets` to push data to your webhook.
+6. Use `Download Local CSV` to export the collected leads.
 
-## Export Options
+## Webhook Export
 
-- `Trigger Webhook to Sheets`: sends the current lead set to a configured webhook URL.
-- `Download Local CSV`: exports lead data as a CSV file.
-- `Export All` or `Only Leads with Emails` filter options are available.
+The extension posts harvested leads in JSON format:
 
-## Data Captured
+```json
+{
+  "source": "MapsHarvester",
+  "leads": [ ... ]
+}
+```
 
-Each lead may include:
-
-- Business name
-- Category
-- Address
-- Phone number
-- Website URL
-- Google Maps rating
-- Review count
-- Email address (from deep crawl)
-- Social links (from homepage/contact page)
-
-## Architecture
-
-- `manifest.json` - extension metadata and permissions
-- `sidepanel.html` - extension UI
-- `sidepanel.js` - UI behavior and interaction handling
-- `content.js` - Google Maps page scraper injected into the active tab
-- `service_worker.js` - background worker, lead deduplication, deep crawl, and CSV export
+This payload can be consumed by n8n, Zapier, Make, or any webhook-capable automation.
 
 ## Notes
 
-- Navigate to a Google Maps listing or search results page before starting.
-- The extension uses Chrome storage to retain leads, history, and settings.
-- The webhook payload is JSON with `source: "MapsHarvester"` and the `leads` array.
-
-## License
-
-This repository does not specify a license. Add one if you want to publish or share it publicly.
+- The current version does not include direct Google Sheets integration.
+- For best results, run the extension on a Google Maps search results page.
+- The extension uses Chrome local storage to retain leads, history, and webhook settings.
