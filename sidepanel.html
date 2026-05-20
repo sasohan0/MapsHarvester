@@ -3,75 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Maps Harvester Pro</title>
+    <title>Maps Harvester V5</title>
     <style>
       :root {
-        --bg-color: #f8fafc;
-        --card-bg: #ffffff;
-        --text-main: #1e293b;
-        --text-muted: #64748b;
-        --primary: #4f46e5;
-        --primary-hover: #4338ca;
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --accent: #3b82f6;
+        --accent-glow: #60a5fa;
         --danger: #ef4444;
-        --danger-hover: #dc2626;
         --success: #10b981;
-        --success-hover: #059669;
-        --border: #e2e8f0;
+        --sheets: #10b981;
       }
-
       * {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
       }
-
       body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-          Arial, sans-serif;
-        background-color: var(--bg-color);
-        color: var(--text-main);
+        background: var(--bg);
+        color: var(--text);
         display: flex;
         flex-direction: column;
         height: 100vh;
+        overflow: hidden;
       }
 
-      /* Header */
+      /* Mesmerizing Header */
       .header {
-        background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(10px);
         padding: 20px;
-        color: white;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         display: flex;
         justify-content: space-between;
         align-items: center;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
       }
       .header h1 {
-        font-size: 1.25rem;
-        font-weight: 800;
-        letter-spacing: -0.5px;
+        font-size: 1.3rem;
+        font-weight: 900;
+        background: linear-gradient(to right, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
       }
-      .header p {
-        font-size: 0.75rem;
-        opacity: 0.8;
-        margin-top: 2px;
-      }
-
       .indicator {
         height: 12px;
         width: 12px;
         border-radius: 50%;
-        border: 2px solid white;
         background-color: var(--danger);
-        transition: all 0.3s ease;
+        box-shadow: 0 0 10px var(--danger);
+        transition: all 0.3s;
       }
       .indicator.active {
-        background-color: #34d399;
-        box-shadow: 0 0 8px #34d399;
-        animation: pulse 2s infinite;
+        background-color: var(--success);
+        box-shadow: 0 0 15px var(--success);
+        animation: heartbeat 1.5s infinite;
       }
 
-      /* Layout */
       .content-area {
         padding: 16px;
         flex-grow: 1;
@@ -79,15 +70,14 @@
         padding-bottom: 90px;
       }
       .card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
         border-radius: 12px;
         padding: 16px;
         margin-bottom: 16px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        backdrop-filter: blur(5px);
       }
 
-      /* Stats Grid */
       .stats-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -95,283 +85,243 @@
         margin-bottom: 16px;
       }
       .stat-box {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.05);
         border-radius: 12px;
-        padding: 16px;
+        padding: 12px;
         text-align: center;
       }
       .stat-label {
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: var(--text-muted);
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: var(--muted);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 1px;
       }
       .stat-value {
         font-size: 2rem;
         font-weight: 900;
-        color: var(--primary);
-        margin-top: 4px;
-      }
-      .stat-status {
-        font-size: 0.875rem;
-        font-weight: 700;
-        color: var(--text-main);
-        margin-top: 8px;
-      }
-      .stat-status.active {
-        color: var(--primary);
-        animation: pulse 2s infinite;
+        color: var(--accent-glow);
+        text-shadow: 0 0 10px rgba(96, 165, 250, 0.3);
       }
 
-      /* Form Elements */
-      .setting-row {
+      /* Word Cloud */
+      #wordCloud {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        padding: 10px 0;
+        min-height: 50px;
+      }
+      .cloud-word {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+        font-weight: 600;
+        transition: transform 0.3s;
+      }
+      .cloud-word:hover {
+        transform: scale(1.1);
+        background: rgba(59, 130, 246, 0.4);
+      }
+
+      input,
+      select {
+        background: #0f172a;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        width: 100%;
+        margin-bottom: 10px;
+        font-size: 0.85rem;
+        outline: none;
+      }
+      input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
       }
       h3 {
-        font-size: 0.875rem;
+        font-size: 0.85rem;
+        color: #e2e8f0;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
         font-weight: 700;
-        color: #334155;
-        margin-bottom: 12px;
-      }
-      input[type="number"],
-      select {
-        padding: 8px;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        font-size: 0.875rem;
-        color: var(--text-main);
-        outline: none;
-        width: 100%;
-      }
-      input[type="number"] {
-        width: 80px;
-        text-align: center;
-      }
-      select {
-        margin-bottom: 12px;
-        cursor: pointer;
-      }
-      input:focus,
-      select:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
       }
 
-      /* Terminal Log */
       .terminal {
-        background: #0f172a;
-        border-radius: 12px;
-        overflow: hidden;
+        background: #000;
+        border-radius: 8px;
+        border: 1px solid #333;
+        height: 140px;
         display: flex;
         flex-direction: column;
-        height: 180px;
         margin-bottom: 16px;
       }
-      .terminal-header {
-        background: #1e293b;
-        padding: 8px 12px;
-        font-size: 0.7rem;
-        font-family: monospace;
-        color: #94a3b8;
-        display: flex;
-        justify-content: space-between;
-        border-bottom: 1px solid #334155;
-      }
-      .terminal-header span:last-child {
-        cursor: pointer;
-      }
-      .terminal-header span:last-child:hover {
-        color: white;
-      }
       .terminal-body {
-        padding: 12px;
+        padding: 10px;
         overflow-y: auto;
-        font-size: 0.75rem;
-        font-family: monospace;
+        font-family: "Courier New", monospace;
+        font-size: 0.7rem;
+        color: #4ade80;
         flex-grow: 1;
         display: flex;
         flex-direction: column;
-        gap: 4px;
-      }
-      .log-info {
-        color: #4ade80;
+        gap: 3px;
       }
       .log-error {
         color: #f87171;
       }
-      .log-success {
-        color: #818cf8;
+      .log-info {
+        color: #60a5fa;
       }
-      .log-system {
-        color: #64748b;
+      .log-success {
+        color: #a78bfa;
       }
 
-      /* Buttons */
       .btn {
         width: 100%;
         padding: 12px;
         border: none;
         border-radius: 8px;
-        font-size: 0.875rem;
-        font-weight: 700;
+        font-weight: 800;
         cursor: pointer;
-        transition: all 0.2s;
-        text-align: center;
         color: white;
+        transition: all 0.2s;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 1px;
       }
       .btn-primary {
-        background: linear-gradient(to right, var(--primary), #3b82f6);
-        box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);
+        background: linear-gradient(45deg, #2563eb, #4f46e5);
+        box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
       }
       .btn-primary:hover {
-        opacity: 0.9;
-        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+        transform: translateY(-2px);
       }
-      .btn-success {
-        background: var(--success);
-      }
-      .btn-success:hover {
-        background: var(--success-hover);
-      }
-      .btn-danger {
-        background: var(--danger);
-      }
-      .btn-danger:hover {
-        background: var(--danger-hover);
+      .btn-sheets {
+        background: linear-gradient(45deg, #059669, #10b981);
       }
       .btn-disabled {
-        background: #e2e8f0;
+        background: #334155;
         color: #94a3b8;
         cursor: not-allowed;
         box-shadow: none;
       }
-      .btn-disabled:hover {
-        transform: none;
-        opacity: 1;
-      }
       .btn-text {
         background: transparent;
-        color: var(--text-muted);
-        font-size: 0.75rem;
-        padding: 8px;
-        box-shadow: none;
+        color: var(--muted);
+        border: 1px solid #334155;
       }
-      .btn-text:hover {
-        color: var(--danger);
-        text-decoration: underline;
-      }
-
-      /* Fixed Bottom Bar */
       .bottom-bar {
         position: fixed;
         bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
+        width: 100%;
+        background: rgba(15, 23, 42, 0.9);
+        backdrop-filter: blur(10px);
         padding: 16px;
-        border-top: 1px solid var(--border);
         display: flex;
-        gap: 12px;
-        box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.03);
-      }
-      .bottom-bar .btn {
-        flex: 1;
+        gap: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
       }
 
-      @keyframes pulse {
+      @keyframes heartbeat {
         0% {
-          opacity: 1;
+          transform: scale(1);
         }
         50% {
-          opacity: 0.6;
+          transform: scale(1.2);
         }
         100% {
-          opacity: 1;
+          transform: scale(1);
         }
       }
       ::-webkit-scrollbar {
-        width: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
+        width: 4px;
       }
       ::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
+        background: #475569;
         border-radius: 4px;
       }
     </style>
   </head>
   <body>
-    <!-- Header -->
     <div class="header">
       <div>
-        <h1>Maps Harvester <span style="color: #c7d2fe">PRO</span></h1>
-        <p>Advanced Lead Extraction Engine</p>
+        <h1>Maps Harvester V5</h1>
+        <p style="color: #94a3b8; font-size: 0.7rem">
+          Scoring & Niche Analytics
+        </p>
       </div>
       <div id="statusIndicator" class="indicator"></div>
     </div>
 
     <div class="content-area">
-      <!-- Dashboard Stats -->
       <div class="stats-grid">
         <div class="stat-box">
-          <div class="stat-label">Leads Found</div>
+          <div class="stat-label">Session Leads</div>
           <div id="leadCount" class="stat-value">0</div>
         </div>
         <div class="stat-box">
-          <div class="stat-label">Status</div>
-          <div id="statusText" class="stat-status">Idle</div>
-        </div>
-      </div>
-
-      <!-- Settings Panel -->
-      <div class="card">
-        <h3>Scraper Settings</h3>
-        <div class="setting-row">
-          <label for="limit" style="font-size: 0.875rem; font-weight: 500"
-            >Auto-Stop Limit:</label
+          <div class="stat-label">Skipped (Dupes)</div>
+          <div
+            id="skippedCount"
+            class="stat-value"
+            style="color: #94a3b8; text-shadow: none"
           >
-          <input type="number" id="limit" value="100" />
+            0
+          </div>
         </div>
       </div>
 
-      <!-- Live Activity Log -->
-      <div class="terminal">
-        <div class="terminal-header">
-          <span>Terminal Log</span>
-          <span id="clearLog">Clear</span>
-        </div>
-        <div id="logContainer" class="terminal-body">
-          <div class="log-system">> System ready. Open Google Maps.</div>
-        </div>
-      </div>
-
-      <!-- Export Section -->
       <div class="card">
-        <h3>Export Options</h3>
-        <select id="exportFilter">
-          <option value="all">Export All Scraped Leads</option>
-          <option value="email">Only Leads with Emails</option>
-          <option value="phone">Only Leads with Phone Numbers</option>
-        </select>
-        <button id="exportCSV" class="btn btn-success">Download CSV</button>
-        <button id="clearData" class="btn btn-text">
-          Delete All Stored Leads
+        <h3>Live Niche Analytics</h3>
+        <div id="wordCloud">
+          <span style="color: #475569; font-size: 0.75rem"
+            >Waiting for data...</span
+          >
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Target Settings</h3>
+        <input type="number" id="limit" value="100" placeholder="Max Leads" />
+        <input
+          type="text"
+          id="baseLocation"
+          placeholder="Your Base Address (For distance routing)"
+        />
+      </div>
+
+      <div class="terminal">
+        <div id="logContainer" class="terminal-body">
+          <div style="color: #64748b">> V5 Neural Engine Online.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Export CRM Data</h3>
+        <button id="exportCSV" class="btn btn-primary">
+          Download Intelligent CSV
         </button>
+        <button id="clearData" class="btn btn-text">Purge Memory</button>
       </div>
     </div>
 
-    <!-- Fixed Bottom Controls -->
     <div class="bottom-bar">
-      <button id="startBtn" class="btn btn-primary">Start Engine</button>
-      <button id="stopBtn" class="btn btn-disabled" disabled>Stop</button>
+      <button id="startBtn" class="btn btn-primary" style="flex: 2">
+        Deploy Scanner
+      </button>
+      <button id="stopBtn" class="btn btn-disabled" disabled style="flex: 1">
+        Halt
+      </button>
     </div>
-
     <script src="sidepanel.js"></script>
   </body>
 </html>
