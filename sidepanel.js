@@ -21,6 +21,7 @@ const UI = {
   currentQueryLabel: document.getElementById("currentQueryLabel"),
   highPriorityCount: document.getElementById("highPriorityCount"),
   emailLeadCount: document.getElementById("emailLeadCount"),
+  phoneLeadCount: document.getElementById("phoneLeadCount"),
 };
 
 const State = {
@@ -47,6 +48,14 @@ function slugify(value) {
     .replace(/--+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 50);
+}
+
+function storageGet(keys) {
+  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+}
+
+function storageSet(items) {
+  return new Promise((resolve) => chrome.storage.local.set(items, resolve));
 }
 
 function getDownloadDateStamp() {
@@ -97,12 +106,14 @@ function getLeadStatusCounts(leads) {
   const counts = {
     highPriority: 0,
     emailCount: 0,
+    phoneCount: 0,
     status: {},
     tagged: 0,
   };
   leads.forEach((lead) => {
     if (lead.score >= 70) counts.highPriority += 1;
-    if (lead.email) counts.emailCount += 1;
+    if (lead.email && lead.email.trim()) counts.emailCount += 1;
+    if (lead.phone && lead.phone.trim()) counts.phoneCount += 1;
     const status = lead.status || "new";
     counts.status[status] = (counts.status[status] || 0) + 1;
     if (Array.isArray(lead.tags) && lead.tags.length) counts.tagged += 1;
@@ -114,6 +125,7 @@ function refreshLeadMetrics(leads) {
   const counts = getLeadStatusCounts(leads);
   UI.highPriorityCount.innerText = counts.highPriority;
   UI.emailLeadCount.innerText = counts.emailCount;
+  if (UI.phoneLeadCount) UI.phoneLeadCount.innerText = counts.phoneCount;
 }
 
 function buildWebhookPayload(leads, queryLabel) {
@@ -146,7 +158,7 @@ function buildWebhookPayload(leads, queryLabel) {
 }
 
 async function loadSavedSearches() {
-  const storage = await chrome.storage.local.get(["savedSearches"]);
+  const storage = await storageGet(["savedSearches"]);
   State.savedSearches = storage.savedSearches || [];
   UI.savedSearches.innerHTML = "<option value=''>Select saved profile</option>";
   State.savedSearches.forEach((profile, index) => {
@@ -220,7 +232,12 @@ async function applyTagToLeads() {
 
 function getActiveQueryLabel() {
   if (State.activeSearchProfile) return State.activeSearchProfile.queryLabel;
-  return UI.currentQueryLabel.innerText.replace(/^(Current query|Active profile):\s*/i, "") || "maps";
+  return (
+    UI.currentQueryLabel.innerText.replace(
+      /^(Current query|Active profile):\s*/i,
+      "",
+    ) || "maps"
+  );
 }
 
 async function getMapSearchLabel() {
@@ -255,6 +272,49 @@ async function buildDownloadFileName(filter) {
   return `MapsHarvester_${searchLabel}_${cloudLabel}_${statusLabel}_${filterLabel}_${dateStamp}.csv`;
 }
 
+function buildCSVText(leads) {
+  const quote = (value) => `"${(value || "").toString().replace(/"/g, '""')}"`;
+  const headers = [
+    "Business Name",
+    "Lead Score",
+    "Priority",
+    "Status",
+    "Tags",
+    "Category",
+    "Address",
+    "Phone",
+    "Email",
+    "Website",
+    "Rating",
+    "Reviews",
+    "SEO Audit Link",
+    "Directions Link",
+    "Social Links",
+  ];
+  let csv = `${headers.join(",")}\n`;
+  leads.forEach((lead) => {
+    csv += [
+      quote(lead.name),
+      quote(lead.score),
+      quote(lead.priority),
+      quote(lead.status),
+      quote(Array.isArray(lead.tags) ? lead.tags.join("|") : ""),
+      quote(lead.category),
+      quote(lead.address),
+      quote(lead.phone),
+      quote(lead.email),
+      quote(lead.website),
+      quote(lead.rating),
+      quote(lead.reviews),
+      quote(lead.seoLink),
+      quote(lead.routeLink),
+      quote(lead.socials),
+    ].join(",");
+    csv += "\n";
+  });
+  return csv;
+}
+
 // Event-Driven UI Update
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.leads) {
@@ -269,28 +329,25 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 
 // Initial Load
-chrome.storage.local.get(
-  [
-    "leads",
-    "skippedCount",
-    "isScraping",
-    "baseLocation",
-    "savedWebhook",
-    "savedSearches",
-  ],
-  async (res) => {
-    UI.leads.innerText = (res.leads || []).length;
-    UI.skipped.innerText = res.skippedCount || 0;
-    if (res.baseLocation) UI.baseLoc.value = res.baseLocation;
-    if (res.savedWebhook) UI.webhookUrl.value = res.savedWebhook;
-    State.savedSearches = res.savedSearches || [];
-    toggleState(res.isScraping || false);
-    generateWordCloud(res.leads || []);
-    refreshLeadMetrics(res.leads || []);
-    await loadSavedSearches();
-    await setCurrentQueryLabel();
-  },
-);
+storageGet([
+  "leads",
+  "skippedCount",
+  "isScraping",
+  "baseLocation",
+  "savedWebhook",
+  "savedSearches",
+]).then(async (res) => {
+  UI.leads.innerText = (res.leads || []).length;
+  UI.skipped.innerText = res.skippedCount || 0;
+  if (res.baseLocation) UI.baseLoc.value = res.baseLocation;
+  if (res.savedWebhook) UI.webhookUrl.value = res.savedWebhook;
+  State.savedSearches = res.savedSearches || [];
+  toggleState(res.isScraping || false);
+  generateWordCloud(res.leads || []);
+  refreshLeadMetrics(res.leads || []);
+  await loadSavedSearches();
+  await setCurrentQueryLabel();
+});
 
 UI.baseLoc.addEventListener("change", (e) =>
   chrome.storage.local.set({ baseLocation: e.target.value }),
@@ -425,26 +482,36 @@ document.getElementById("exportCSV").addEventListener("click", async () => {
   const filterValue = UI.exportFilter.value;
   const statusValue = UI.statusFilter.value;
   const fileName = await buildDownloadFileName(filterValue);
+  const storage = await storageGet("leads");
+  let leads = storage.leads || [];
 
-  chrome.runtime.sendMessage(
-    { action: "generateCSV", filter: filterValue, status: statusValue },
-    (response) => {
-      if (response && response.csvText) {
-        const blob = new Blob([response.csvText], {
-          type: "text/csv;charset=utf-8;",
-        });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", fileName);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        addLog(`CSV export complete: ${fileName}`, "success");
-      } else {
-        addLog("CSV export failed or returned no data.", "error");
-      }
-    },
-  );
+  if (filterValue === "email") {
+    leads = leads.filter((lead) => lead.email && lead.email.trim());
+  }
+  if (statusValue && statusValue !== "all") {
+    if (statusValue === "high-priority") {
+      leads = leads.filter((lead) => lead.priority === "high");
+    } else {
+      leads = leads.filter((lead) => lead.status === statusValue);
+    }
+  }
+
+  if (!leads.length) {
+    addLog("CSV export failed: no leads match the selected filters.", "error");
+    return;
+  }
+
+  const csvText = buildCSVText(leads);
+  const blob = new Blob([csvText], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", fileName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  addLog(`CSV export complete: ${fileName}`, "success");
 });

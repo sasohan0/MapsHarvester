@@ -15,10 +15,17 @@ chrome.sidePanel
 // 2. Keep-Alive Mechanism
 const KEEP_ALIVE_INTERVAL = 20000;
 setInterval(() => {
-  chrome.storage.local.get("isScraping");
+  storageGet("isScraping");
 }, KEEP_ALIVE_INTERVAL);
 
-// ... (Keep the rest of your service worker code exactly as it was) ...
+function storageGet(keys) {
+  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+}
+
+function storageSet(items) {
+  return new Promise((resolve) => chrome.storage.local.set(items, resolve));
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // ...
   if (request.action === "processLeads") {
@@ -45,7 +52,7 @@ function normalizeLeadId(name, address) {
 
 async function handleNewLeads(newLeads) {
   try {
-    let storage = await chrome.storage.local.get([
+    let storage = await storageGet([
       "leads",
       "masterHistory",
       "skippedCount",
@@ -110,7 +117,7 @@ async function handleNewLeads(newLeads) {
 
       leads.push(lead);
     }
-    await chrome.storage.local.set({
+    await storageSet({
       leads,
       masterHistory: Array.from(history),
       skippedCount: skipped,
@@ -150,7 +157,7 @@ async function deepCrawl(baseUrl) {
 }
 
 async function exportToCSV(filter, status = "all") {
-  let { leads = [] } = await chrome.storage.local.get("leads");
+  let { leads = [] } = await storageGet("leads");
   if (filter === "email") {
     leads = leads.filter((lead) => lead.email && lead.email.trim() !== "");
   }
