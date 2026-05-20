@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Maps Harvester Pro</title>
+    <style>
+      :root {
+        --bg-color: #f8fafc;
+        --card-bg: #ffffff;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --primary: #4f46e5;
+        --primary-hover: #4338ca;
+        --danger: #ef4444;
+        --danger-hover: #dc2626;
+        --success: #10b981;
+        --success-hover: #059669;
+        --border: #e2e8f0;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      /* Header */
+      .header {
+        background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+        padding: 20px;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+      .header h1 {
+        font-size: 1.25rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+      }
+      .header p {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        margin-top: 2px;
+      }
+
+      .indicator {
+        height: 12px;
+        width: 12px;
+        border-radius: 50%;
+        border: 2px solid white;
+        background-color: var(--danger);
+        transition: all 0.3s ease;
+      }
+      .indicator.active {
+        background-color: #34d399;
+        box-shadow: 0 0 8px #34d399;
+        animation: pulse 2s infinite;
+      }
+
+      /* Layout */
+      .content-area {
+        padding: 16px;
+        flex-grow: 1;
+        overflow-y: auto;
+        padding-bottom: 90px;
+      }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+
+      /* Stats Grid */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .stat-box {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+      }
+      .stat-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .stat-value {
+        font-size: 2rem;
+        font-weight: 900;
+        color: var(--primary);
+        margin-top: 4px;
+      }
+      .stat-status {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-top: 8px;
+      }
+      .stat-status.active {
+        color: var(--primary);
+        animation: pulse 2s infinite;
+      }
+
+      /* Form Elements */
+      .setting-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      h3 {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 12px;
+      }
+      input[type="number"],
+      select {
+        padding: 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 0.875rem;
+        color: var(--text-main);
+        outline: none;
+        width: 100%;
+      }
+      input[type="number"] {
+        width: 80px;
+        text-align: center;
+      }
+      select {
+        margin-bottom: 12px;
+        cursor: pointer;
+      }
+      input:focus,
+      select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+      }
+
+      /* Terminal Log */
+      .terminal {
+        background: #0f172a;
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 180px;
+        margin-bottom: 16px;
+      }
+      .terminal-header {
+        background: #1e293b;
+        padding: 8px 12px;
+        font-size: 0.7rem;
+        font-family: monospace;
+        color: #94a3b8;
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #334155;
+      }
+      .terminal-header span:last-child {
+        cursor: pointer;
+      }
+      .terminal-header span:last-child:hover {
+        color: white;
+      }
+      .terminal-body {
+        padding: 12px;
+        overflow-y: auto;
+        font-size: 0.75rem;
+        font-family: monospace;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .log-info {
+        color: #4ade80;
+      }
+      .log-error {
+        color: #f87171;
+      }
+      .log-success {
+        color: #818cf8;
+      }
+      .log-system {
+        color: #64748b;
+      }
+
+      /* Buttons */
+      .btn {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+        color: white;
+      }
+      .btn-primary {
+        background: linear-gradient(to right, var(--primary), #3b82f6);
+        box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);
+      }
+      .btn-primary:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+      }
+      .btn-success {
+        background: var(--success);
+      }
+      .btn-success:hover {
+        background: var(--success-hover);
+      }
+      .btn-danger {
+        background: var(--danger);
+      }
+      .btn-danger:hover {
+        background: var(--danger-hover);
+      }
+      .btn-disabled {
+        background: #e2e8f0;
+        color: #94a3b8;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .btn-disabled:hover {
+        transform: none;
+        opacity: 1;
+      }
+      .btn-text {
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        padding: 8px;
+        box-shadow: none;
+      }
+      .btn-text:hover {
+        color: var(--danger);
+        text-decoration: underline;
+      }
+
+      /* Fixed Bottom Bar */
+      .bottom-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        padding: 16px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        gap: 12px;
+        box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.03);
+      }
+      .bottom-bar .btn {
+        flex: 1;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.6;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Maps Harvester <span style="color: #c7d2fe">PRO</span></h1>
+        <p>Advanced Lead Extraction Engine</p>
+      </div>
+      <div id="statusIndicator" class="indicator"></div>
+    </div>
+
+    <div class="content-area">
+      <!-- Dashboard Stats -->
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">Leads Found</div>
+          <div id="leadCount" class="stat-value">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Status</div>
+          <div id="statusText" class="stat-status">Idle</div>
+        </div>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="card">
+        <h3>Scraper Settings</h3>
+        <div class="setting-row">
+          <label for="limit" style="font-size: 0.875rem; font-weight: 500"
+            >Auto-Stop Limit:</label
+          >
+          <input type="number" id="limit" value="100" />
+        </div>
+      </div>
+
+      <!-- Live Activity Log -->
+      <div class="terminal">
+        <div class="terminal-header">
+          <span>Terminal Log</span>
+          <span id="clearLog">Clear</span>
+        </div>
+        <div id="logContainer" class="terminal-body">
+          <div class="log-system">> System ready. Open Google Maps.</div>
+        </div>
+      </div>
+
+      <!-- Export Section -->
+      <div class="card">
+        <h3>Export Options</h3>
+        <select id="exportFilter">
+          <option value="all">Export All Scraped Leads</option>
+          <option value="email">Only Leads with Emails</option>
+          <option value="phone">Only Leads with Phone Numbers</option>
+        </select>
+        <button id="exportCSV" class="btn btn-success">Download CSV</button>
+        <button id="clearData" class="btn btn-text">
+          Delete All Stored Leads
+        </button>
+      </div>
+    </div>
+
+    <!-- Fixed Bottom Controls -->
+    <div class="bottom-bar">
+      <button id="startBtn" class="btn btn-primary">Start Engine</button>
+      <button id="stopBtn" class="btn btn-disabled" disabled>Stop</button>
+    </div>
+
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

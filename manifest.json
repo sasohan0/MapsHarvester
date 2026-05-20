@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Maps Harvester Pro",
+  "version": "2.0",
+  "description": "Advanced Lead Extraction Engine",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "activeTab",
+    "scripting",
+    "downloads"
+  ],
+  "host_permissions": [
+    "*://*.google.com/*",
+    "*://*.google.co.uk/*",
+    "*://*.google.com.bd/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "service_worker.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open Harvester"
+  }
+}
