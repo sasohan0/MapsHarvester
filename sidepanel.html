@@ -307,6 +307,18 @@
 
       <div class="card">
         <h3>Export CRM Data</h3>
+        <input
+          type="text"
+          id="webhookUrl"
+          placeholder="Webhook URL (n8n, Zapier, Make)"
+        />
+        <button id="sendWebhook" class="btn btn-sheets">
+          Push Leads to Webhook
+        </button>
+        <select id="exportFilter">
+          <option value="all">Export All Leads</option>
+          <option value="email">Export Only Leads with Emails</option>
+        </select>
         <button id="exportCSV" class="btn btn-primary">
           Download Intelligent CSV
         </button>

@@ -25,7 +25,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleNewLeads(request.leads).then(() => sendResponse({ status: "ok" }));
     return true; // Keep message channel open for async
   } else if (request.action === "generateCSV") {
-    exportToCSV().then((csvText) => sendResponse({ csvText }));
+    exportToCSV(request.filter).then((csvText) => sendResponse({ csvText }));
     return true;
   } else if (request.action === "ping") {
     sendResponse({ status: "alive" });
@@ -126,8 +126,11 @@ async function deepCrawl(baseUrl) {
   return { email, socials: [...new Set(socials)].join(" | ") };
 }
 
-async function exportToCSV() {
+async function exportToCSV(filter) {
   let { leads = [] } = await chrome.storage.local.get("leads");
+  if (filter === "email") {
+    leads = leads.filter((lead) => lead.email && lead.email.trim() !== "");
+  }
   let csv =
     "Business Name,Lead Score,Category,Address,Phone,Email,Website,Rating,Reviews,SEO Audit Link,Directions Link,Social Links\n";
   leads.forEach((l) => {

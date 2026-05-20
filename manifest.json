@@ -3,7 +3,7 @@
   "name": "Maps Harvester V5 - The CRM Engine",
   "version": "5.0",
   "description": "Lead Scoring, Word Clouds, and Smart Routing.",
-  "permissions": ["sidePanel", "storage", "activeTab", "scripting", "downloads", "identity"],
+  "permissions": ["sidePanel", "storage", "activeTab", "scripting", "downloads"],
   "host_permissions": ["*://*.google.com/*", "*://*.google.com.bd/*", "http://*/*", "https://*/*"],
   "background": { "service_worker": "service_worker.js" },
   "side_panel": { "default_path": "sidepanel.html" },

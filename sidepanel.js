@@ -8,6 +8,9 @@ const UI = {
   indicator: document.getElementById("statusIndicator"),
   cloud: document.getElementById("wordCloud"),
   baseLoc: document.getElementById("baseLocation"),
+  webhookUrl: document.getElementById("webhookUrl"),
+  exportFilter: document.getElementById("exportFilter"),
+  sendWebhook: document.getElementById("sendWebhook"),
 };
 
 function addLog(msg, type = "info") {
@@ -32,11 +35,12 @@ chrome.storage.onChanged.addListener((changes) => {
 
 // Initial Load
 chrome.storage.local.get(
-  ["leads", "skippedCount", "isScraping", "baseLocation"],
+  ["leads", "skippedCount", "isScraping", "baseLocation", "savedWebhook"],
   (res) => {
     UI.leads.innerText = (res.leads || []).length;
     UI.skipped.innerText = res.skippedCount || 0;
     if (res.baseLocation) UI.baseLoc.value = res.baseLocation;
+    if (res.savedWebhook) UI.webhookUrl.value = res.savedWebhook;
     toggleState(res.isScraping || false);
     generateWordCloud(res.leads || []);
   },
@@ -99,14 +103,8 @@ UI.start.addEventListener("click", async () => {
       return;
     }
 
-    // Wake up Service Worker if it slept
     await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: "ping" }, (response) => {
-        if (chrome.runtime.lastError) {
-          /* ignore */
-        }
-        resolve();
-      });
+      chrome.runtime.sendMessage({ action: "ping" }, () => resolve());
     });
 
     chrome.storage.local.set({
@@ -115,7 +113,6 @@ UI.start.addEventListener("click", async () => {
     });
     addLog("Deploying scanner to Maps...", "info");
 
-    // Inject the robust execution guard script
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ["content.js"],
@@ -137,19 +134,62 @@ document.getElementById("clearData").addEventListener("click", () => {
   addLog("Memory Purged.", "info");
 });
 
-document.getElementById("exportCSV").addEventListener("click", () => {
-  chrome.runtime.sendMessage({ action: "generateCSV" }, (response) => {
-    if (response && response.csvText) {
-      const blob = new Blob([response.csvText], {
-        type: "text/csv;charset=utf-8;",
+UI.sendWebhook.addEventListener("click", () => {
+  const webhook = UI.webhookUrl.value.trim();
+  if (!webhook) {
+    addLog("Enter a valid webhook URL first.", "error");
+    return;
+  }
+
+  chrome.storage.local.get("leads", async (result) => {
+    const leads = result.leads || [];
+    if (!leads.length) {
+      addLog("No leads available to send.", "error");
+      return;
+    }
+
+    chrome.storage.local.set({ savedWebhook: webhook });
+    addLog("Pushing leads to webhook...", "info");
+
+    try {
+      const response = await fetch(webhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "MapsHarvester", leads }),
       });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `Maps_V5_CRM_${new Date().getTime()}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      URL.revokeObjectURL(url);
+      if (!response.ok) {
+        throw new Error(`${response.status} ${response.statusText}`);
+      }
+      addLog("Webhook push succeeded.", "success");
+    } catch (error) {
+      addLog(`Webhook push failed: ${error.message}`, "error");
     }
   });
+});
+
+document.getElementById("exportCSV").addEventListener("click", () => {
+  chrome.runtime.sendMessage(
+    { action: "generateCSV", filter: UI.exportFilter.value },
+    (response) => {
+      if (response && response.csvText) {
+        const blob = new Blob([response.csvText], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute(
+          "download",
+          `Maps_V5_CRM_${UI.exportFilter.value}_${new Date().getTime()}.csv`,
+        );
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        addLog("CSV export complete.", "success");
+      } else {
+        addLog("CSV export failed or returned no data.", "error");
+      }
+    },
+  );
 });

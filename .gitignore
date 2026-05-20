@@ -1,0 +1,5 @@
+# Ignore local helpers and documentation drafts
+Project_Details.md
+generate_assets.py
+__pycache__/
+*.pyc

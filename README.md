@@ -34,9 +34,9 @@ Maps Harvester injects a smart scraping engine directly into Google Maps results
 - **Google Maps scraping**: extracts business name, category, address, phone, website, rating, and reviews.
 - **Deep enrichment**: crawls lead websites and contact pages for email and social profiles.
 - **Duplicate protection**: skips duplicate businesses using `masterHistory`.
-- **Webhook export**: send leads to n8n, Zapier, Make, or any HTTP endpoint.
+- **Webhook export**: send leads to n8n, Zapier, Make, or any HTTP endpoint using the webhook URL field.
 - **Local CSV export**: download your data with optional email filtering.
-- **Minimal UI**: side panel UX with live logging, counters, and controls.
+- **Minimal UI**: side panel UX with live logging, counters, webhook controls, and export filters.
 
 ---
 
@@ -104,10 +104,10 @@ Additional state tracked by the extension:
 
 1. Open the extension side panel.
 2. Enter the desired lead limit.
-3. Click **Start Scraping** while on a Google Maps results page.
-4. Monitor the live terminal log and lead counters.
-5. Use **Trigger Webhook to Sheets** to deliver data to your webhook.
-6. Use **Download Local CSV** to export the collected leads.
+3. Enter your webhook URL if you want to push data to automation tools.
+4. Click **Start Scraping** while on a Google Maps results page.
+5. Monitor the live terminal log and lead counters.
+6. Use **Push Leads to Webhook** or **Download Intelligent CSV** to export data.
 
 ---
 
