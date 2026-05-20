@@ -37,6 +37,12 @@ function sendLog(text, type = "info") {
   chrome.runtime.sendMessage({ action: "log", text, type }).catch(() => {});
 }
 
+function normalizeLeadId(name, address) {
+  return `${(name || "").trim().toLowerCase()}|${(address || "").trim().toLowerCase()}`
+    .replace(/\s+/g, " ")
+    .replace(/[^a-z0-9 \-\|]/gi, "");
+}
+
 async function handleNewLeads(newLeads) {
   try {
     let storage = await chrome.storage.local.get([
@@ -45,16 +51,23 @@ async function handleNewLeads(newLeads) {
       "skippedCount",
       "baseLocation",
     ]);
-    let leads = storage.leads || [],
-      history = storage.masterHistory || [],
-      skipped = storage.skippedCount || 0;
+    let leads = storage.leads || [];
+    let history = new Set(storage.masterHistory || []);
+    let skipped = storage.skippedCount || 0;
 
-    for (let lead of newLeads) {
-      if (history.includes(lead.id)) {
+    for (let rawLead of newLeads) {
+      const leadId = normalizeLeadId(rawLead.name, rawLead.address);
+      if (history.has(leadId)) {
         skipped++;
         continue;
       }
-      history.push(lead.id);
+      history.add(leadId);
+
+      let lead = {
+        ...rawLead,
+        id: leadId,
+        tags: Array.isArray(rawLead.tags) ? rawLead.tags : [],
+      };
 
       // Deep Crawl
       if (lead.website) {
@@ -73,6 +86,16 @@ async function handleNewLeads(newLeads) {
       score += lead.website ? 20 : 0;
       score += lead.email ? 20 : 0;
       lead.score = Math.round(score);
+      lead.priority =
+        lead.score >= 70 ? "high" : lead.score >= 45 ? "medium" : "low";
+      lead.status = lead.status || (lead.email ? "new" : "no-email");
+      lead.completeness = [
+        lead.name,
+        lead.address,
+        lead.phone,
+        lead.website,
+        lead.email,
+      ].filter(Boolean).length;
 
       lead.seoLink = lead.website
         ? `https://pagespeed.web.dev/analysis?url=${encodeURIComponent(lead.website)}`
@@ -89,7 +112,7 @@ async function handleNewLeads(newLeads) {
     }
     await chrome.storage.local.set({
       leads,
-      masterHistory: history,
+      masterHistory: Array.from(history),
       skippedCount: skipped,
     });
   } catch (err) {
@@ -126,16 +149,23 @@ async function deepCrawl(baseUrl) {
   return { email, socials: [...new Set(socials)].join(" | ") };
 }
 
-async function exportToCSV(filter) {
+async function exportToCSV(filter, status = "all") {
   let { leads = [] } = await chrome.storage.local.get("leads");
   if (filter === "email") {
     leads = leads.filter((lead) => lead.email && lead.email.trim() !== "");
   }
+  if (status && status !== "all") {
+    if (status === "high-priority") {
+      leads = leads.filter((lead) => lead.priority === "high");
+    } else {
+      leads = leads.filter((lead) => lead.status === status);
+    }
+  }
   let csv =
-    "Business Name,Lead Score,Category,Address,Phone,Email,Website,Rating,Reviews,SEO Audit Link,Directions Link,Social Links\n";
+    "Business Name,Lead Score,Priority,Status,Tags,Category,Address,Phone,Email,Website,Rating,Reviews,SEO Audit Link,Directions Link,Social Links\n";
   leads.forEach((l) => {
     const w = (s) => `"${(s || "").toString().replace(/"/g, '""')}"`;
-    csv += `${w(l.name)},${w(l.score)},${w(l.category)},${w(l.address)},${w(l.phone)},${w(l.email)},${w(l.website)},${w(l.rating)},${w(l.reviews)},${w(l.seoLink)},${w(l.routeLink)},${w(l.socials)}\n`;
+    csv += `${w(l.name)},${w(l.score)},${w.priority},${w.status},${w.tags?.join("|") || ""},${w(l.category)},${w(l.address)},${w(l.phone)},${w(l.email)},${w(l.website)},${w(l.rating)},${w(l.reviews)},${w(l.seoLink)},${w(l.routeLink)},${w(l.socials)}\n`;
   });
   return csv;
 }

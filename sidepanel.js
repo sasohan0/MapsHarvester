@@ -10,11 +10,23 @@ const UI = {
   baseLoc: document.getElementById("baseLocation"),
   webhookUrl: document.getElementById("webhookUrl"),
   exportFilter: document.getElementById("exportFilter"),
-  sendWebhook: document.getElementById("sendWebhook"),
+  webhookPayloadMode: document.getElementById("webhookPayloadMode"),
+  statusFilter: document.getElementById("statusFilter"),
+  leadTagInput: document.getElementById("leadTagInput"),
+  applyTag: document.getElementById("applyTag"),
+  profileName: document.getElementById("profileName"),
+  saveSearchProfile: document.getElementById("saveSearchProfile"),
+  savedSearches: document.getElementById("savedSearches"),
+  applySavedSearch: document.getElementById("applySavedSearch"),
+  currentQueryLabel: document.getElementById("currentQueryLabel"),
+  highPriorityCount: document.getElementById("highPriorityCount"),
+  emailLeadCount: document.getElementById("emailLeadCount"),
 };
 
 const State = {
   cloudTags: [],
+  savedSearches: [],
+  activeSearchProfile: null,
 };
 
 function addLog(msg, type = "info") {
@@ -47,6 +59,170 @@ function getDownloadDateStamp() {
   return `${yyyy}${mm}${dd}_${hh}${min}`;
 }
 
+async function getCurrentSearchMeta() {
+  let query = "maps";
+  let url = "";
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    if (tab) {
+      url = tab.url || "";
+      const normalized = new URL(url);
+      if (normalized.searchParams.has("q")) {
+        query = normalized.searchParams.get("q");
+      } else if (normalized.pathname.includes("/search/")) {
+        query = decodeURIComponent(
+          normalized.pathname.split("/search/")[1].split("/")[0] || "maps",
+        );
+      } else if (tab.title) {
+        query = tab.title.replace(/\s*-\s*Google Maps$/i, "");
+      }
+    }
+  } catch (err) {
+    console.warn("Could not derive map search label", err);
+  }
+  return { query: slugify(query || "maps"), url };
+}
+
+async function setCurrentQueryLabel() {
+  const { query } = await getCurrentSearchMeta();
+  UI.currentQueryLabel.innerText = `Current query: ${query}`;
+}
+
+function normalizeLeadId(name, address) {
+  return slugify(`${name}_${address || ""}`);
+}
+
+function getLeadStatusCounts(leads) {
+  const counts = {
+    highPriority: 0,
+    emailCount: 0,
+    status: {},
+    tagged: 0,
+  };
+  leads.forEach((lead) => {
+    if (lead.score >= 70) counts.highPriority += 1;
+    if (lead.email) counts.emailCount += 1;
+    const status = lead.status || "new";
+    counts.status[status] = (counts.status[status] || 0) + 1;
+    if (Array.isArray(lead.tags) && lead.tags.length) counts.tagged += 1;
+  });
+  return counts;
+}
+
+function refreshLeadMetrics(leads) {
+  const counts = getLeadStatusCounts(leads);
+  UI.highPriorityCount.innerText = counts.highPriority;
+  UI.emailLeadCount.innerText = counts.emailCount;
+}
+
+function buildWebhookPayload(leads, queryLabel) {
+  if (UI.webhookPayloadMode.value === "crm") {
+    return {
+      source: "MapsHarvester",
+      queryLabel,
+      totalLeads: leads.length,
+      leads: leads.map((lead) => ({
+        company: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        website: lead.website,
+        score: lead.score,
+        category: lead.category,
+        address: lead.address,
+        status: lead.status || "new",
+        tags: lead.tags || [],
+        routeLink: lead.routeLink,
+        seoLink: lead.seoLink,
+      })),
+    };
+  }
+  return {
+    source: "MapsHarvester",
+    queryLabel,
+    totalLeads: leads.length,
+    leads,
+  };
+}
+
+async function loadSavedSearches() {
+  const storage = await chrome.storage.local.get(["savedSearches"]);
+  State.savedSearches = storage.savedSearches || [];
+  UI.savedSearches.innerHTML = "<option value=''>Select saved profile</option>";
+  State.savedSearches.forEach((profile, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.text = `${profile.name} — ${profile.queryLabel}`;
+    UI.savedSearches.appendChild(option);
+  });
+}
+
+async function saveCurrentSearchProfile() {
+  const profileName = UI.profileName.value.trim();
+  if (!profileName) {
+    addLog("Enter a preset name before saving.", "error");
+    return;
+  }
+  const { query, url } = await getCurrentSearchMeta();
+  const profile = {
+    name: profileName,
+    queryLabel: query,
+    url,
+    createdAt: new Date().toISOString(),
+  };
+  State.savedSearches = State.savedSearches.filter(
+    (item) => item.name !== profile.name,
+  );
+  State.savedSearches.unshift(profile);
+  await chrome.storage.local.set({ savedSearches: State.savedSearches });
+  UI.profileName.value = "";
+  addLog(`Saved search preset: ${profile.name} (${query})`, "success");
+  await loadSavedSearches();
+}
+
+function applySavedSearchProfile() {
+  const selectedIndex = UI.savedSearches.value;
+  if (selectedIndex === "") {
+    addLog("Choose a saved profile first.", "error");
+    return;
+  }
+  const profile = State.savedSearches[parseInt(selectedIndex, 10)];
+  if (!profile) {
+    addLog("Saved profile not found.", "error");
+    return;
+  }
+  State.activeSearchProfile = profile;
+  UI.currentQueryLabel.innerText = `Active profile: ${profile.name} (${profile.queryLabel})`;
+  addLog(`Activated search preset: ${profile.name}`, "info");
+}
+
+async function applyTagToLeads() {
+  const tag = UI.leadTagInput.value.trim();
+  if (!tag) {
+    addLog("Enter a tag before applying.", "error");
+    return;
+  }
+  const { leads = [] } = await chrome.storage.local.get("leads");
+  if (!leads.length) {
+    addLog("No leads available to tag.", "error");
+    return;
+  }
+  const normalizedTag = slugify(tag);
+  const updated = leads.map((lead) => {
+    const tags = Array.isArray(lead.tags) ? [...lead.tags] : [];
+    if (!tags.includes(normalizedTag)) tags.push(normalizedTag);
+    return { ...lead, tags };
+  });
+  await chrome.storage.local.set({ leads: updated });
+  UI.leadTagInput.value = "";
+  addLog(`Applied tag to ${updated.length} leads: ${normalizedTag}`, "success");
+}
+
+function getActiveQueryLabel() {
+  if (State.activeSearchProfile) return State.activeSearchProfile.queryLabel;
+  return UI.currentQueryLabel.innerText.replace(/^(Current query|Active profile):\s*/i, "") || "maps";
+}
+
 async function getMapSearchLabel() {
   let query = "maps";
   try {
@@ -57,7 +233,9 @@ async function getMapSearchLabel() {
       if (url.searchParams.has("q")) {
         query = url.searchParams.get("q");
       } else if (url.pathname.includes("/search/")) {
-        query = decodeURIComponent(url.pathname.split("/search/")[1].split("/")[0] || "maps");
+        query = decodeURIComponent(
+          url.pathname.split("/search/")[1].split("/")[0] || "maps",
+        );
       } else if (tab.title) {
         query = tab.title.replace(/\s*-\s*Google Maps$/i, "");
       }
@@ -69,11 +247,12 @@ async function getMapSearchLabel() {
 }
 
 async function buildDownloadFileName(filter) {
-  const searchLabel = await getMapSearchLabel();
+  const searchLabel = getActiveQueryLabel() || (await getMapSearchLabel());
   const cloudLabel = State.cloudTags.slice(0, 3).join("-") || "lead";
+  const statusLabel = UI.statusFilter.value.replace(/_/g, "-");
   const dateStamp = getDownloadDateStamp();
   const filterLabel = filter === "email" ? "emails-only" : "all";
-  return `MapsHarvester_${searchLabel}_${cloudLabel}_${filterLabel}_${dateStamp}.csv`;
+  return `MapsHarvester_${searchLabel}_${cloudLabel}_${statusLabel}_${filterLabel}_${dateStamp}.csv`;
 }
 
 // Event-Driven UI Update
@@ -82,6 +261,7 @@ chrome.storage.onChanged.addListener((changes) => {
     const leadsArr = changes.leads.newValue || [];
     UI.leads.innerText = leadsArr.length;
     generateWordCloud(leadsArr);
+    refreshLeadMetrics(leadsArr);
   }
   if (changes.skippedCount)
     UI.skipped.innerText = changes.skippedCount.newValue || 0;
@@ -90,20 +270,35 @@ chrome.storage.onChanged.addListener((changes) => {
 
 // Initial Load
 chrome.storage.local.get(
-  ["leads", "skippedCount", "isScraping", "baseLocation", "savedWebhook"],
-  (res) => {
+  [
+    "leads",
+    "skippedCount",
+    "isScraping",
+    "baseLocation",
+    "savedWebhook",
+    "savedSearches",
+  ],
+  async (res) => {
     UI.leads.innerText = (res.leads || []).length;
     UI.skipped.innerText = res.skippedCount || 0;
     if (res.baseLocation) UI.baseLoc.value = res.baseLocation;
     if (res.savedWebhook) UI.webhookUrl.value = res.savedWebhook;
+    State.savedSearches = res.savedSearches || [];
     toggleState(res.isScraping || false);
     generateWordCloud(res.leads || []);
+    refreshLeadMetrics(res.leads || []);
+    await loadSavedSearches();
+    await setCurrentQueryLabel();
   },
 );
 
 UI.baseLoc.addEventListener("change", (e) =>
   chrome.storage.local.set({ baseLocation: e.target.value }),
 );
+
+UI.saveSearchProfile.addEventListener("click", saveCurrentSearchProfile);
+UI.applySavedSearch.addEventListener("click", applySavedSearchProfile);
+UI.applyTag.addEventListener("click", applyTagToLeads);
 
 function toggleState(isScraping) {
   if (isScraping) {
@@ -198,7 +393,7 @@ UI.sendWebhook.addEventListener("click", () => {
     return;
   }
 
-  chrome.storage.local.get("leads", async (result) => {
+  chrome.storage.local.get(["leads", "savedWebhook"], async (result) => {
     const leads = result.leads || [];
     if (!leads.length) {
       addLog("No leads available to send.", "error");
@@ -206,13 +401,15 @@ UI.sendWebhook.addEventListener("click", () => {
     }
 
     chrome.storage.local.set({ savedWebhook: webhook });
+    const queryLabel = getActiveQueryLabel();
+    const payload = buildWebhookPayload(leads, queryLabel);
     addLog("Pushing leads to webhook...", "info");
 
     try {
       const response = await fetch(webhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: "MapsHarvester", leads }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         throw new Error(`${response.status} ${response.statusText}`);
@@ -226,10 +423,11 @@ UI.sendWebhook.addEventListener("click", () => {
 
 document.getElementById("exportCSV").addEventListener("click", async () => {
   const filterValue = UI.exportFilter.value;
+  const statusValue = UI.statusFilter.value;
   const fileName = await buildDownloadFileName(filterValue);
 
   chrome.runtime.sendMessage(
-    { action: "generateCSV", filter: filterValue },
+    { action: "generateCSV", filter: filterValue, status: statusValue },
     (response) => {
       if (response && response.csvText) {
         const blob = new Blob([response.csvText], {

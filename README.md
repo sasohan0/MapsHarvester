@@ -34,8 +34,10 @@ Maps Harvester injects a smart scraping engine directly into Google Maps results
 - **Google Maps scraping**: extracts business name, category, address, phone, website, rating, and reviews.
 - **Deep enrichment**: crawls lead websites and contact pages for email and social profiles.
 - **Duplicate protection**: skips duplicate businesses using `masterHistory`.
-- **Webhook export**: send leads to n8n, Zapier, Make, or any HTTP endpoint using the webhook URL field.
-- **Local CSV export**: download your data with optional email filtering.
+- **Lead scoring & prioritization**: leads receive a score, priority tier, and status tag.
+- **Saved search presets**: capture current Maps query metadata and reuse it later.
+- **CRM-ready webhook mapping**: choose raw or mapped payloads for automation tools.
+- **Local CSV export**: download your data with optional email filtering and status-based exports.
 - **Dynamic CSV naming**: exports are saved with map search keywords, top word cloud categories, and a date stamp.
 - **Minimal UI**: side panel UX with live logging, counters, webhook controls, and export filters.
 
@@ -77,6 +79,9 @@ Additional state tracked by the extension:
 - `masterHistory`: deduplication history.
 - `skippedCount`: duplicate lead counter.
 - `isScraping`: current scraping status.
+- `priority`: lead tier assigned by score.
+- `status`: workflow state such as `new`, `contacted`, or `no-email`.
+- `tags`: custom workflow labels for filtered exports.
 
 ---
 

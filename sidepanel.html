@@ -278,6 +278,14 @@
             0
           </div>
         </div>
+        <div class="stat-box">
+          <div class="stat-label">High Priority</div>
+          <div id="highPriorityCount" class="stat-value">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Emails Found</div>
+          <div id="emailLeadCount" class="stat-value">0</div>
+        </div>
       </div>
 
       <div class="card">
@@ -299,6 +307,26 @@
         />
       </div>
 
+      <div class="card">
+        <h3>Saved Search Presets</h3>
+        <p
+          id="currentQueryLabel"
+          style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px"
+        >
+          Current query: awaiting active Maps tab...
+        </p>
+        <input type="text" id="profileName" placeholder="Preset name" />
+        <button id="saveSearchProfile" class="btn btn-primary">
+          Save Search Profile
+        </button>
+        <select id="savedSearches">
+          <option value="">Select saved profile</option>
+        </select>
+        <button id="applySavedSearch" class="btn btn-sheets">
+          Activate Profile
+        </button>
+      </div>
+
       <div class="terminal">
         <div id="logContainer" class="terminal-body">
           <div style="color: #64748b">> V5 Neural Engine Online.</div>
@@ -312,6 +340,10 @@
           id="webhookUrl"
           placeholder="Webhook URL (n8n, Zapier, Make)"
         />
+        <select id="webhookPayloadMode">
+          <option value="raw">Raw JSON Payload</option>
+          <option value="crm">CRM Mapped Payload</option>
+        </select>
         <button id="sendWebhook" class="btn btn-sheets">
           Push Leads to Webhook
         </button>
@@ -319,6 +351,24 @@
           <option value="all">Export All Leads</option>
           <option value="email">Export Only Leads with Emails</option>
         </select>
+        <select id="statusFilter">
+          <option value="all">Status: All Leads</option>
+          <option value="high-priority">Status: High Priority</option>
+          <option value="contacted">Status: Contacted</option>
+          <option value="no-email">Status: No Email</option>
+          <option value="new">Status: New</option>
+        </select>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px">
+          <input
+            id="leadTagInput"
+            type="text"
+            placeholder="Add workflow tag"
+            style="flex: 1"
+          />
+          <button id="applyTag" class="btn btn-text" style="flex: 0 0 120px">
+            Apply Tag
+          </button>
+        </div>
         <button id="exportCSV" class="btn btn-primary">
           Download Intelligent CSV
         </button>

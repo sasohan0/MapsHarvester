@@ -93,6 +93,12 @@ if (typeof window.__MAPS_HARVESTER_ACTIVE__ === "undefined") {
     }
   }
 
+  function normalizeLeadId(name, address) {
+    return `${(name || "").trim().toLowerCase()}|${(address || "").trim().toLowerCase()}`
+      .replace(/\s+/g, " ")
+      .replace(/[^a-z0-9 \-\|]/gi, "");
+  }
+
   function extractListings() {
     const cards = document.querySelectorAll("div.Nv2PK");
     let newLeads = [];
@@ -146,7 +152,7 @@ if (typeof window.__MAPS_HARVESTER_ACTIVE__ === "undefined") {
         }
 
         newLeads.push({
-          id: name,
+          id: normalizeLeadId(name, address),
           name,
           category,
           address,
