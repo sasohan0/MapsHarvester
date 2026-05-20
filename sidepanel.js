@@ -1,9 +1,21 @@
 // sidepanel.js
+function getEl(id) {
+  return document.getElementById(id);
+}
+
+function bindEvent(element, event, handler, label) {
+  if (!element) {
+    console.warn(`MapsHarvester: missing UI element '${label || event}'`);
+    return;
+  }
+  element.addEventListener(event, handler);
+}
+
 const UI = {
-  start: document.getElementById("startBtn"),
-  stop: document.getElementById("stopBtn"),
-  log: document.getElementById("logContainer"),
-  leads: document.getElementById("leadCount"),
+  start: getEl("startBtn"),
+  stop: getEl("stopBtn"),
+  log: getEl("logContainer"),
+  leads: getEl("leadCount"),
   skipped: document.getElementById("skippedCount"),
   indicator: document.getElementById("statusIndicator"),
   cloud: document.getElementById("wordCloud"),
@@ -34,8 +46,12 @@ function addLog(msg, type = "info") {
   const div = document.createElement("div");
   div.innerText = `> ${msg}`;
   div.className = `log-${type}`;
-  UI.log.appendChild(div);
-  UI.log.scrollTop = UI.log.scrollHeight;
+  if (UI.log) {
+    UI.log.appendChild(div);
+    UI.log.scrollTop = UI.log.scrollHeight;
+  } else {
+    console[type === "error" ? "error" : "log"](`MapsHarvester: ${msg}`);
+  }
 }
 
 function slugify(value) {
@@ -349,13 +365,26 @@ storageGet([
   await setCurrentQueryLabel();
 });
 
-UI.baseLoc.addEventListener("change", (e) =>
-  chrome.storage.local.set({ baseLocation: e.target.value }),
+bindEvent(
+  UI.baseLoc,
+  "change",
+  (e) => chrome.storage.local.set({ baseLocation: e.target.value }),
+  "baseLocation",
 );
 
-UI.saveSearchProfile.addEventListener("click", saveCurrentSearchProfile);
-UI.applySavedSearch.addEventListener("click", applySavedSearchProfile);
-UI.applyTag.addEventListener("click", applyTagToLeads);
+bindEvent(
+  UI.saveSearchProfile,
+  "click",
+  saveCurrentSearchProfile,
+  "saveSearchProfile",
+);
+bindEvent(
+  UI.applySavedSearch,
+  "click",
+  applySavedSearchProfile,
+  "applySavedSearch",
+);
+bindEvent(UI.applyTag, "click", applyTagToLeads, "applyTag");
 
 function toggleState(isScraping) {
   if (isScraping) {
@@ -374,13 +403,19 @@ function toggleState(isScraping) {
 }
 
 function generateWordCloud(leads) {
-  if (leads.length === 0) return;
+  if (!Array.isArray(leads) || leads.length === 0 || !UI.cloud) {
+    if (UI.cloud) UI.cloud.innerHTML = "";
+    State.cloudTags = [];
+    return;
+  }
+
   const words = {};
   leads.forEach((l) => {
-    if (l.category) {
-      let w = l.category.split(" ")[0];
-      words[w] = (words[w] || 0) + 1;
-    }
+    const category = (l.category || "").toString().trim();
+    if (!category) return;
+    const w = category.split(" ")[0].trim();
+    if (!w) return;
+    words[w] = (words[w] || 0) + 1;
   });
 
   const sorted = Object.entries(words)
@@ -389,10 +424,11 @@ function generateWordCloud(leads) {
   UI.cloud.innerHTML = "";
   State.cloudTags = [];
   sorted.forEach(([word, count]) => {
-    let span = document.createElement("span");
+    if (!word) return;
+    const span = document.createElement("span");
     span.className = "cloud-word";
-    span.innerText = word;
-    let size = 0.65 + count * 0.05;
+    span.textContent = word;
+    const size = 0.65 + count * 0.05;
     span.style.fontSize = `${Math.min(size, 1.2)}rem`;
     UI.cloud.appendChild(span);
     State.cloudTags.push(slugify(word));
@@ -403,47 +439,65 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === "log") addLog(msg.text, msg.type);
 });
 
-UI.start.addEventListener("click", async () => {
-  try {
-    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+bindEvent(
+  UI.start,
+  "click",
+  async () => {
+    try {
+      let [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
 
-    if (!tab || !tab.url || !tab.url.includes("/maps")) {
-      addLog("Error: Open a Google Maps tab first.", "error");
-      return;
+      if (!tab || !tab.url || !tab.url.includes("/maps")) {
+        addLog("Error: Open a Google Maps tab first.", "error");
+        return;
+      }
+
+      await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: "ping" }, () => resolve());
+      });
+
+      chrome.storage.local.set({
+        isScraping: true,
+        targetLimit: parseInt(document.getElementById("limit").value) || 100,
+      });
+      addLog("Deploying scanner to Maps...", "info");
+
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["content.js"],
+      });
+    } catch (err) {
+      addLog(`Injection failed: ${err.message}`, "error");
+      chrome.storage.local.set({ isScraping: false });
     }
+  },
+  "startBtn",
+);
 
-    await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: "ping" }, () => resolve());
-    });
-
-    chrome.storage.local.set({
-      isScraping: true,
-      targetLimit: parseInt(document.getElementById("limit").value) || 100,
-    });
-    addLog("Deploying scanner to Maps...", "info");
-
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["content.js"],
-    });
-  } catch (err) {
-    addLog(`Injection failed: ${err.message}`, "error");
+bindEvent(
+  UI.stop,
+  "click",
+  () => {
     chrome.storage.local.set({ isScraping: false });
-  }
-});
+    addLog("Manual Halt Initiated.", "error");
+  },
+  "stopBtn",
+);
 
-UI.stop.addEventListener("click", () => {
-  chrome.storage.local.set({ isScraping: false });
-  addLog("Manual Halt Initiated.", "error");
-});
+bindEvent(
+  getEl("clearData"),
+  "click",
+  () => {
+    chrome.storage.local.set({ leads: [], masterHistory: [], skippedCount: 0 });
+    if (UI.cloud) UI.cloud.innerHTML = "";
+    addLog("Memory Purged.", "info");
+  },
+  "clearData",
+);
 
-document.getElementById("clearData").addEventListener("click", () => {
-  chrome.storage.local.set({ leads: [], masterHistory: [], skippedCount: 0 });
-  UI.cloud.innerHTML = "";
-  addLog("Memory Purged.", "info");
-});
-
-UI.sendWebhook.addEventListener("click", () => {
+bindEvent(UI.sendWebhook, "click", () => {
   const webhook = UI.webhookUrl.value.trim();
   if (!webhook) {
     addLog("Enter a valid webhook URL first.", "error");
@@ -478,9 +532,9 @@ UI.sendWebhook.addEventListener("click", () => {
   });
 });
 
-document.getElementById("exportCSV").addEventListener("click", async () => {
-  const filterValue = UI.exportFilter.value;
-  const statusValue = UI.statusFilter.value;
+bindEvent(getEl("exportCSV"), "click", async () => {
+  const filterValue = UI.exportFilter ? UI.exportFilter.value : "all";
+  const statusValue = UI.statusFilter ? UI.statusFilter.value : "all";
   const fileName = await buildDownloadFileName(filterValue);
   const storage = await storageGet("leads");
   let leads = storage.leads || [];
